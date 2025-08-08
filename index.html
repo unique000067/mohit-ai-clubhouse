@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Mohit AI Clubhouse — Demo (Final)</title>
+  <meta name="description" content="Mohit AI Clubhouse — Offline demo with flower rain, lightning clicks, role-based AI, voice features, history." />
+  <style>
+    /* ---------- Variables & Base ---------- */
+    :root{
+      --bg-1: #061025;
+      --bg-2: #071428;
+      --accent1: #ff7ab6;
+      --accent2: #7ae7ff;
+      --muted: rgba(230,238,248,0.72);
+      --glass: rgba(255,255,255,0.03);
+      --radius: 14px;
+      --maxw: 1100px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:Inter, "Noto Sans", system-ui,-apple-system,Segoe UI, Roboto, sans-serif;background:linear-gradient(180deg,var(--bg-1),var(--bg-2));color:#e6eef8;-webkit-font-smoothing:antialiased}
+    a{color:inherit}
+    .wrap{max-width:var(--maxw);margin:18px auto;padding:18px;border-radius:18px;position:relative;overflow:hidden}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);border-radius:12px;padding:12px;border:1px solid rgba(255,255,255,0.03);box-shadow:0 8px 40px rgba(1,6,12,0.6)}
+    header{display:flex;align-items:center;gap:12px}
+    #logo {width:64px;height:64px;border-radius:12px;overflow:hidden;border:1px solid rgba(255,255,255,0.04);flex:0 0 64px}
+    #logo img{width:100%;height:100%;object-fit:cover;display:block}
+    h1{font-size:20px;margin:0;background:linear-gradient(90deg,var(--accent1),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent;font-weight:800}
+    .subtitle{font-size:12px;color:var(--muted);margin-top:4px}
+
+    /* ---------- Layout ---------- */
+    .main{display:grid;grid-template-columns:360px 1fr;gap:16px;margin-top:14px}
+    @media(max-width:980px){.main{grid-template-columns:1fr}}
+    .left{display:flex;flex-direction:column;gap:12px}
+    .sectionTitle{font-weight:700;color:var(--muted);font-size:13px;margin-bottom:6px}
+    input,select,textarea{background:transparent;color:inherit;border:1px solid rgba(255,255,255,0.04);padding:8px;border-radius:8px}
+    .btn{display:inline-flex;align-items:center;justify-content:center;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);cursor:pointer;background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent)}
+    .small{font-size:12px;color:var(--muted)}
+    .roleList{display:flex;flex-wrap:wrap;gap:8px}
+    .role{padding:10px;border-radius:10px;background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent);cursor:pointer;border:1px solid rgba(255,255,255,0.02);flex:1 0 48%;text-align:center}
+    .role.active{outline:2px solid rgba(122,231,255,0.08);box-shadow:0 8px 28px rgba(122,231,255,0.03)}
+    .history{max-height:220px;overflow:auto;padding:8px;border-radius:10px;border:1px dashed rgba(255,255,255,0.02);background:transparent}
+    .hist-item{display:flex;justify-content:space-between;gap:8px;padding:8px;border-radius:8px;margin-bottom:6px;background:linear-gradient(90deg, rgba(255,255,255,0.01), transparent)}
+
+    /* ---------- Stage / Chat ---------- */
+    .stage{position:relative;min-height:520px;padding:16px;border-radius:12px;overflow:hidden}
+    .aiBg{position:absolute;inset:0;z-index:0;display:flex;align-items:center;justify-content:center;pointer-events:none;opacity:0.12}
+    .aiBg img{max-width:100%;max-height:100%;transform-origin:center center;transition:transform 220ms ease}
+    .rainLayer{position:absolute;inset:0;pointer-events:none;z-index:40;overflow:hidden}
+    .petal{position:absolute;width:30px;height:30px;background-size:cover;opacity:0;will-change:transform,opacity}
+    .flash{position:absolute;pointer-events:none;border-radius:50%;transform:translate(-50%,-50%) scale(0.2);opacity:0;z-index:60}
+
+    .chatBox{position:relative;z-index:10;display:flex;flex-direction:column;gap:12px;height:100%}
+    .transcript{flex:1;background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent);padding:12px;border-radius:10px;overflow:auto;border:1px solid rgba(255,255,255,0.03)}
+    .inputRow{display:flex;gap:8px;align-items:flex-end}
+    textarea{flex:1;min-height:64px;padding:12px;border-radius:10px;background:transparent;border:1px solid rgba(255,255,255,0.04);color:inherit;resize:vertical}
+    .metaRow{display:flex;justify-content:space-between;align-items:center;gap:8px}
+    .neonText{font-weight:800;background:linear-gradient(90deg,var(--accent1),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent;font-size:18px}
+
+    /* ---------- Welcome Overlay (fade-out) ---------- */
+    .welcomeOverlay{position:fixed;inset:0;background:linear-gradient(180deg, rgba(3,6,10,0.96), rgba(2,4,8,0.96));display:flex;align-items:center;justify-content:center;flex-direction:column;z-index:9999;transition:opacity 520ms ease, transform 520ms ease;opacity:1}
+    .welcomeOverlay.hidden{opacity:0;transform:translateY(-6vh);pointer-events:none}
+    .welcomeOverlay h2{font-size:36px;margin-bottom:10px}
+    .emojiCanvas{position:absolute;inset:0;z-index:0}
+    @media(max-width:500px){ h1{font-size:18px} .role{flex:0 0 100%} textarea{min-height:56px} }
+
+    /* ---------- small ---------- */
+    .footer{margin-top:12px;font-size:12px;color:var(--muted);display:flex;justify-content:space-between;align-items:center}
+  </style>
+</head>
+<body>
+  <div class="wrap card" id="app">
+    <header>
+      <div id="logo"><img src="ailogo.png" alt="Mohit AI Logo" id="brandImg"></div>
+      <div style="flex:1">
+        <h1>Mohit AI Clubhouse</h1>
+        <div class="subtitle">Voice • Memory • Emotions — Offline demo</div>
+      </div>
+      <div>
+        <div class="small">Made for <strong>Mohit Donawat</strong></div>
+      </div>
+    </header>
+
+    <div class="main" style="margin-top:12px">
+      <!-- LEFT -->
+      <div class="left card">
+        <div>
+          <div class="sectionTitle">User Info</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <input id="userName" placeholder="Name" />
+            <select id="userGender">
+              <option value="">Gender</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="other">Other</option>
+            </select>
+            <input id="userAge" placeholder="Age" type="number" />
+            <input id="userArea" placeholder="Area / City" />
+            <input id="aiName" placeholder="AI Name (e.g., Riya)" />
+            <div style="display:flex;gap:8px">
+              <div class="btn" id="saveInfoBtn">Save</div>
+              <div class="btn" id="editInfoBtn" style="display:none">Edit</div>
+            </div>
+          </div>
+        </div>
+
+        <hr style="border:none;height:8px;opacity:0" />
+
+        <div>
+          <div class="sectionTitle">Roles / Characters</div>
+          <div class="roleList" id="roleList"></div>
+          <div class="small" style="margin-top:8px">Tap to select active character</div>
+        </div>
+
+        <hr style="border:none;height:8px;opacity:0" />
+
+        <div>
+          <div class="sectionTitle">Background & Effects</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div class="small">Logo Zoom</div>
+            <input type="range" id="zoomSlider" min="0.6" max="1.8" step="0.01" value="1">
+            <div class="small">Rain Intensity</div>
+            <input type="range" id="rainIntensity" min="0" max="60" step="1" value="20">
+            <div style="display:flex;gap:8px;margin-top:6px">
+              <div class="btn" id="toggleRainBtn">Toggle Rain</div>
+              <div class="btn" id="clearBgBtn">Reset BG</div>
+            </div>
+          </div>
+        </div>
+
+        <hr style="border:none;height:8px;opacity:0" />
+
+        <div>
+          <div class="sectionTitle">History</div>
+          <div class="history" id="historyBox"></div>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <div class="btn" id="exportHistory">Export</div>
+            <div class="btn" id="clearHistory">Clear</div>
+          </div>
+        </div>
+
+        <div style="margin-top:6px" class="small">Tip: Press <strong>Enter</strong> to trigger slow-motion flower/heart rain OR to accept Welcome.</div>
+      </div>
+
+      <!-- RIGHT -->
+      <div class="stage card" id="stage">
+        <div class="aiBg" id="aiBg">
+          <img id="aiLogo" src="ailogo.png" alt="AI Background">
+        </div>
+
+        <div class="rainLayer" id="rainLayer"></div>
+        <div class="flash" id="flash"></div>
+
+        <div class="chatBox">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+            <div>
+              <div class="neonText" id="titleRole">AI Conversation</div>
+              <div class="small">Selected: <span id="selectedRole">None</span> • AI: <span id="aiLabel">Your AI</span></div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <div class="small">TTS Voice</div>
+              <select id="voiceSelect" style="padding:8px;border-radius:8px"></select>
+            </div>
+          </div>
+
+          <div class="transcript" id="transcript" tabindex="0"></div>
+
+          <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+            <div style="flex:1;display:flex;flex-direction:column;gap:8px">
+              <textarea id="userInput" placeholder="Type message here... or use mic"></textarea>
+              <div style="display:flex;gap:8px;align-items:center">
+                <div class="btn" id="sendBtn">Send</div>
+                <div class="btn" id="startRec">🎤 Record</div>
+                <div class="btn" id="stopRec">⏹ Stop</div>
+                <div class="btn" id="v2vBtn">V→V</div>
+                <div class="btn" id="ttsBtn">🔊 Speak</div>
+                <div class="btn" id="exportChatBtn">Export Chat</div>
+              </div>
+            </div>
+
+            <div style="width:220px;display:flex;flex-direction:column;gap:8px">
+              <div class="card" style="padding:10px">
+                <div class="small">AI Mood</div>
+                <select id="aiMood" style="width:100%;padding:8px;border-radius:8px">
+                  <option value="neutral">Neutral</option>
+                  <option value="romantic">Romantic</option>
+                  <option value="emotional">Emotional</option>
+                  <option value="motivational">Motivational</option>
+                  <option value="naughty">Naughty</option>
+                  <option value="fatherly">Fatherly</option>
+                </select>
+              </div>
+
+              <div class="card" style="padding:10px">
+                <div class="small">Translate</div>
+                <div style="display:flex;gap:8px;margin-top:6px">
+                  <div class="btn" id="toHindi">Hindi</div>
+                  <div class="btn" id="toEnglish">English</div>
+                </div>
+              </div>
+
+              <div class="card" style="padding:10px">
+                <div class="small">Quick Actions</div>
+                <div style="display:flex;gap:8px;margin-top:8px">
+                  <div class="btn" id="saveMemoryBtn">Save Memory</div>
+                  <div class="btn" id="loadMemoryBtn">Load Memory</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="metaRow" style="margin-top:8px">
+            <div class="small">Status: <span id="status">Idle</span></div>
+            <div class="small">Last: <span id="lastTime">-</span></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="footer">
+      <div>Demo build • Offline-ready basic features</div>
+      <div>Mohit AI Clubhouse — v1</div>
+    </div>
+  </div>
+
+  <!-- Welcome overlay with emoji canvas (no display:none; use fade) -->
+  <div class="welcomeOverlay" id="welcome">
+    <canvas class="emojiCanvas" id="welcomeCanvas"></canvas>
+    <h2>✨ Welcome to Mohit AI Clubhouse ✨</h2>
+    <div style="display:flex;gap:8px;z-index:2">
+      <div class="btn" id="enterBtn">Enter</div>
+      <div class="btn" id="skipWelcome">Skip</div>
+    </div>
+    <div style="margin-top:14px;color:var(--muted);z-index:2">Press <strong>Enter</strong> on keyboard to enter</div>
+  </div>
+
+  <script>
+  /***********************
+   * Integrated JS Logic *
+   ***********************/
+
+  // ---------- DOM refs ----------
+  const roleListEl = document.getElementById('roleList');
+  const roles = ['Boyfriend','Girlfriend','Father','Mother','Friend','Wife','Husband','Student','Teacher','Brother','Sister','Team','Coach','Mentor'];
+  const selectedRoleSpan = document.getElementById('selectedRole');
+  const aiLabel = document.getElementById('aiLabel');
+  const aiLogo = document.getElementById('aiLogo');
+  const zoomSlider = document.getElementById('zoomSlider');
+  const rainLayer = document.getElementById('rainLayer');
+  const rainIntensity = document.getElementById('rainIntensity');
+  const sendBtn = document.getElementById('sendBtn');
+  const userInput = document.getElementById('userInput');
+  const transcript = document.getElementById('transcript');
+  const startRecBtn = document.getElementById('startRec');
+  const stopRecBtn = document.getElementById('stopRec');
+  const v2vBtn = document.getElementById('v2vBtn');
+  const ttsBtn = document.getElementById('ttsBtn');
+  const voiceSelect = document.getElementById('voiceSelect');
+  const historyBox = document.getElementById('historyBox');
+  const exportHistoryBtn = document.getElementById('exportHistory');
+  const clearHistoryBtn = document.getElementById('clearHistory');
+  const exportChatBtn = document.getElementById('exportChatBtn');
+  const saveInfoBtn = document.getElementById('saveInfoBtn');
+  const editInfoBtn = document.getElementById('editInfoBtn');
+  const aiMood = document.getElementById('aiMood');
+  const statusEl = document.getElementById('status');
+  const lastTimeEl = document.getElementById('lastTime');
+  const toggleRainBtn = document.getElementById('toggleRainBtn');
+  const flashEl = document.getElementById('flash');
+  const enterBtn = document.getElementById('enterBtn');
+  const welcome = document.getElementById('welcome');
+  const welcomeCanvas = document.getElementById('welcomeCanvas');
+
+  // ---------- User / Memory / History ----------
+  let userInfo = { name:'', gender:'', age:'', area:'', aiName:'' };
+  const HISTORY_KEY = 'mohit_ai_history_v3';
+  const MEMORY_KEY_PREFIX = 'mohit_ai_memory_';
+
+  function loadHistory(){ const raw = localStorage.getItem(HISTORY_KEY); try{return raw?JSON.parse(raw):[];}catch(e){return [];} }
+  function saveHistory(items){ localStorage.setItem(HISTORY_KEY, JSON.stringify(items)); renderHistory(); }
+  function addHistoryItem(obj){ const items = loadHistory(); items.unshift(obj); saveHistory(items); }
+  function renderHistory(){ const items = loadHistory(); historyBox.innerHTML=''; items.slice(0,60).forEach(it=>{ const el=document.createElement('div'); el.className='hist-item'; el.innerHTML=`<div style="flex:1"><div class="small">${escapeHtml(it.role||'')}</div><div>${escapeHtml(it.from)}: ${escapeHtml(it.text)}</div></div><div class="small">${new Date(it.ts).toLocaleString()}</div>`; historyBox.appendChild(el); }); }
+
+  // ---------- Roles ----------
+  function renderRoles(){ roleListEl.innerHTML=''; roles.forEach(r=>{ const el=document.createElement('div'); el.className='role'; el.textContent=r; el.dataset.role=r; el.addEventListener('click', ()=>selectRole(r, el)); roleListEl.appendChild(el); }); selectRole(roles[0], roleListEl.firstChild); }
+  function selectRole(role, el){ document.querySelectorAll('.role').forEach(x=>x.classList.remove('active')); if(el) el.classList.add('active'); selectedRoleSpan.textContent = role; aiLabel.textContent = userInfo.aiName || 'Your AI'; statusEl.textContent = 'Role: ' + role; }
+
+  // ---------- Logo zoom ----------
+  zoomSlider.addEventListener('input', ()=>{ aiLogo.style.transform = `scale(${zoomSlider.value})`; });
+
+  // ---------- Rain ----------
+  let rainEnabled = true;
+  toggleRainBtn.addEventListener('click', ()=>{ rainEnabled = !rainEnabled; toggleRainBtn.textContent = rainEnabled ? 'Toggle Rain' : 'Rain Off'; });
+
+  function createPetal(type, x, delay){
+    const el = document.createElement('div');
+    el.className = 'petal';
+    const flower = 'data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"48\" height=\"48\"><circle cx=\"24\" cy=\"24\" r=\"8\" fill=\"%23ff7ab6\"/></svg>';
+    const heart = 'data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 32 29\" width=\"48\" height=\"48\"><path fill=\"%23ff7ab6\" d=\"M23.6 0C20.9 0 18.6 1.5 16 4 13.4 1.5 11.1 0 8.4 0 3.9 0 0 3.9 0 8.4 0 17 16 29 16 29s16-12 16-20.6C32 3.9 28.1 0 23.6 0z\"/></svg>';
+    el.style.left = x + '%';
+    el.style.top = '-10%';
+    el.style.backgroundImage = `url('${Math.random()>0.5?flower:heart}')`;
+    el.style.opacity = 0;
+    rainLayer.appendChild(el);
+
+    const duration = 4000 + Math.random()*3000;
+    const rotate = (Math.random()*80)-40;
+    setTimeout(()=>{
+      try{
+        el.animate([
+          { transform: `translateY(0) rotate(0deg)`, opacity: 0 },
+          { transform: `translateY(120vh) rotate(${rotate}deg)`, opacity: 1 }
+        ], { duration: duration, easing: 'cubic-bezier(.2,.8,.2,1)' }).onfinish = ()=>el.remove();
+      }catch(e){ el.remove(); }
+    }, delay);
+  }
+
+  function spawnRainBurst(count){
+    for(let i=0;i<count;i++){
+      createPetal(null, Math.random()*100, Math.random()*800);
+    }
+  }
+
+  setInterval(()=>{
+    if(!rainEnabled) return;
+    const n = Math.max(1, Math.round(+rainIntensity.value/10));
+    spawnRainBurst(n);
+  }, 900);
+
+  // ---------- Flash effect ----------
+  function flashOnce(x,y){
+    flashEl.style.left = x + 'px';
+    flashEl.style.top = y + 'px';
+    flashEl.style.width = '20px';
+    flashEl.style.height = '20px';
+    flashEl.style.background = 'radial-gradient(circle, rgba(255,255,255,0.95), rgba(122,231,255,0.18), transparent)';
+    flashEl.style.opacity = '1';
+    flashEl.animate([
+      { transform: 'translate(-50%,-50%) scale(0.2)', opacity: 1 },
+      { transform: 'translate(-50%,-50%) scale(8)', opacity: 0 }
+    ], { duration: 420 }).onfinish = ()=>{ flashEl.style.opacity = 0; };
+  }
+
+  // attach flash to all .btn elements (delegation for dynamic is not strictly necessary here)
+  document.querySelectorAll('.btn').forEach(btn=>{
+    btn.addEventListener('click', (ev)=>{
+      const r = ev.currentTarget.getBoundingClientRect();
+      const x = r.left + r.width/2;
+      const y = r.top + r.height/2;
+      flashOnce(x,y);
+      for(let i=0;i<6;i++) createPetal(null, (x/window.innerWidth)*100 + (Math.random()*8-4), i*40);
+    });
+  });
+
+  // ---------- SpeechRec & TTS ----------
+  let recognition = null;
+  let recognizing = false;
+  function setupRecognition(){
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if(!SpeechRecognition) return null;
+    recognition = new SpeechRecognition();
+    recognition.lang = 'hi-IN';
+    recognition.interimResults = false;
+    recognition.onstart = ()=>{ recognizing = true; startRecBtn.textContent = 'Listening...'; statusEl.textContent = 'Listening'; };
+    recognition.onend = ()=>{ recognizing = false; startRecBtn.textContent = '🎤 Record'; statusEl.textContent = 'Idle'; };
+    recognition.onerror = (ev)=>{ console.warn('rec error', ev); statusEl.textContent = 'Rec Error'; };
+    recognition.onresult = (e)=>{
+      const txt = Array.from(e.results).map(r=>r[0].transcript).join('');
+      userInput.value = txt;
+      appendTranscript('You', txt);
+      addHistoryItem({ts: Date.now(), role: selectedRoleSpan.textContent, from:'You', text: txt});
+      setTimeout(()=>handleSend(txt), 200);
+    };
+    return recognition;
+  }
+  setupRecognition();
+
+  startRecBtn.addEventListener('click', ()=>{
+    if(!recognition){ alert('SpeechRecognition not supported in this browser'); return; }
+    if(!recognizing) recognition.start(); else recognition.stop();
+  });
+  stopRecBtn.addEventListener('click', ()=>{ if(recognition) recognition.stop(); });
+
+  function populateVoices(){
+    const synth = window.speechSynthesis;
+    const voices = synth.getVoices();
+    voiceSelect.innerHTML = '';
+    voices.forEach(v=>{
+      const o = document.createElement('option'); o.value = v.name; o.textContent = `${v.name} — ${v.lang}`; voiceSelect.appendChild(o);
+    });
+  }
+  populateVoices();
+  if (typeof speechSynthesis !== 'undefined') speechSynthesis.onvoiceschanged = populateVoices;
+
+  function speak(text, lang='hi-IN'){
+    if(!('speechSynthesis' in window)) return;
+    const synth = window.speechSynthesis;
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = lang;
+    const sel = voiceSelect.value;
+    if(sel){ const v = synth.getVoices().find(x=>x.name === sel); if(v) utter.voice = v; }
+    utter.volume = 1; utter.rate = 1; utter.pitch = 1;
+    synth.speak(utter);
+    statusEl.textContent = 'Speaking';
+    utter.onend = ()=>{ statusEl.textContent = 'Idle'; lastTimeEl.textContent = new Date().toLocaleTimeString(); };
+  }
+
+  // V→V button: record then reply with TTS
+  v2vBtn.addEventListener('click', ()=>{
+    if(!recognition){ alert('SpeechRecognition not supported'); return; }
+    recognition.start();
+    recognition.onresult = (e)=>{
+      const txt = Array.from(e.results).map(r=>r[0].transcript).join('');
+      appendTranscript('You', txt);
+      addHistoryItem({ts: Date.now(), role: selectedRoleSpan.textContent, from:'You', text: txt});
+      const reply = generateReply(txt);
+      appendTranscript(aiLabel.textContent || 'AI', reply);
+      addHistoryItem({ts: Date.now(), role: selectedRoleSpan.textContent, from: aiLabel.textContent || 'AI', text: reply});
+      speak(reply, detectLang(reply));
+    };
+  });
+
+  // ---------- Chat send & mock AI ----------
+  sendBtn.addEventListener('click', ()=>{ const txt = userInput.value.trim(); if(!txt) return; handleSend(txt); });
+  function handleSend(txt){
+    appendTranscript('You', txt);
+    addHistoryItem({ts: Date.now(), role: selectedRoleSpan.textContent, from:'You', text: txt});
+    userInput.value = '';
+    setTimeout(()=>{ const reply = generateReply(txt); appendTranscript(aiLabel.textContent || 'AI', reply); addHistoryItem({ts: Date.now(), role: selectedRoleSpan.textContent, from: aiLabel.textContent || 'AI', text: reply}); speak(reply, detectLang(reply)); }, 600 + Math.random()*700);
+  }
+
+  function generateReply(userText){
+    const mood = aiMood.value || 'neutral';
+    const role = selectedRoleSpan.textContent || '';
+    const user = userInfo.name || 'Friend';
+    let base = '';
+    if(mood === 'romantic') base = `💖 ${user}, tumhari baat sunke dil khush ho gaya. `;
+    else if(mood === 'emotional') base = `😢 ${user}, yeh sunke mujhe bahut ehsaas hua. `;
+    else if(mood === 'motivational') base = `🔥 ${user}, tum kar sakte ho — bas thoda hausla chahiye. `;
+    else if(mood === 'naughty') base = `😉 ${user}, arey aise baatein mat karo — warna ... `;
+    else if(mood === 'fatherly') base = `👨 ${user}, beta/main tumhara khayal rakhunga. `;
+    else base = `${user}, mene aapka message pada. `;
+    let suffix = '';
+    if(role.toLowerCase().includes('teacher')) suffix = 'Padhao aur mehnat jaari rakho.';
+    if(role.toLowerCase().includes('student')) suffix = 'Padhai pe dhyaan do, break lena mat bhoolna.';
+    if(role.toLowerCase().includes('friend')) suffix = 'Chalo milte hain jaldi!';
+    if(role.toLowerCase().includes('father')) suffix = 'Main hamesha tumhare saath hoon.';
+    if(role.toLowerCase().includes('mother')) suffix = 'Maa ka pyar hamesha tumhare saath.';
+    if(role.toLowerCase().includes('boyfriend')||role.toLowerCase().includes('girlfriend')) suffix = 'Tum mere liye khas ho.';
+    return base + suffix + ` (Reply to: "${userText}")`;
+  }
+
+  function appendTranscript(sender, text){
+    const el = document.createElement('div');
+    el.style.marginBottom = '10px';
+    el.innerHTML = `<div style="font-size:12px;color:var(--muted)">${escapeHtml(sender)} • ${new Date().toLocaleTimeString()}</div><div style="margin-top:6px">${escapeHtml(text)}</div>`;
+    transcript.prepend(el);
+    lastTimeEl.textContent = new Date().toLocaleTimeString();
+  }
+
+  // ---------- Language detect (naive) ----------
+  function detectLang(s){
+    if(!s) return 'hi-IN';
+    const enWords = s.match(/[a-zA-Z]{3,}/g);
+    if(enWords && enWords.length > (s.length/10)) return 'en-IN';
+    return 'hi-IN';
+  }
+
+  // ---------- User Info Save/Edit ----------
+  const saveInfoBtnEl = document.getElementById('saveInfoBtn');
+  const editInfoBtnEl = document.getElementById('editInfoBtn');
+  saveInfoBtnEl.addEventListener('click', ()=>{
+    userInfo.name = document.getElementById('userName').value.trim();
+    userInfo.gender = document.getElementById('userGender').value;
+    userInfo.age = document.getElementById('userAge').value;
+    userInfo.area = document.getElementById('userArea').value;
+    userInfo.aiName = document.getElementById('aiName').value.trim() || 'Riya';
+    document.getElementById('userName').disabled = true; document.getElementById('userGender').disabled = true; document.getElementById('userAge').disabled = true; document.getElementById('userArea').disabled = true; document.getElementById('aiName').disabled = true;
+    saveInfoBtnEl.style.display = 'none'; editInfoBtnEl.style.display = 'inline-flex';
+    aiLabel.textContent = userInfo.aiName;
+    localStorage.setItem('mohit_ai_userinfo', JSON.stringify(userInfo));
+  });
+  editInfoBtnEl.addEventListener('click', ()=>{
+    document.getElementById('userName').disabled = false; document.getElementById('userGender').disabled = false; document.getElementById('userAge').disabled = false; document.getElementById('userArea').disabled = false; document.getElementById('aiName').disabled = false;
+    saveInfoBtnEl.style.display = 'inline-flex'; editInfoBtnEl.style.display = 'none';
+  });
+
+  function loadUserInfo(){
+    const raw = localStorage.getItem('mohit_ai_userinfo');
+    if(!raw) return;
+    try{
+      const u = JSON.parse(raw);
+      userInfo = Object.assign(userInfo, u);
+      document.getElementById('userName').value = userInfo.name || '';
+      document.getElementById('userGender').value = userInfo.gender || '';
+      document.getElementById('userAge').value = userInfo.age || '';
+      document.getElementById('userArea').value = userInfo.area || '';
+      document.getElementById('aiName').value = userInfo.aiName || 'Riya';
+      document.getElementById('userName').disabled = true; document.getElementById('userGender').disabled = true; document.getElementById('userAge').disabled = true; document.getElementById('userArea').disabled = true; document.getElementById('aiName').disabled = true;
+      saveInfoBtnEl.style.display = 'none'; editInfoBtnEl.style.display = 'inline-flex';
+      aiLabel.textContent = userInfo.aiName || 'Riya';
+    }catch(e){}
+  }
+  loadUserInfo();
+
+  // ---------- Memory Save/Load per role ----------
+  document.getElementById('saveMemoryBtn').addEventListener('click', ()=>{
+    const key = MEMORY_KEY_PREFIX + (userInfo.name || 'guest') + '|' + selectedRoleSpan.textContent;
+    const items = loadHistory().filter(it => it.role === selectedRoleSpan.textContent);
+    localStorage.setItem(key, JSON.stringify(items));
+    alert('Memory saved for ' + selectedRoleSpan.textContent);
+  });
+  document.getElementById('loadMemoryBtn').addEventListener('click', ()=>{
+    const key = MEMORY_KEY_PREFIX + (userInfo.name || 'guest') + '|' + selectedRoleSpan.textContent;
+    const raw = localStorage.getItem(key);
+    if(!raw){ alert('No memory found for this role'); return;}
+    try{
+      const mem = JSON.parse(raw);
+      const all = loadHistory();
+      const merged = mem.concat(all);
+      saveHistory(merged);
+      alert('Memory loaded for ' + selectedRoleSpan.textContent);
+    }catch(e){ alert('Failed to load memory'); }
+  });
+
+  // ---------- Export chat area ----------
+  exportChatBtn.addEventListener('click', ()=>{
+    const items = loadHistory().filter(it => it.role === selectedRoleSpan.textContent);
+    const blob = new Blob([JSON.stringify(items, null, 2)],{type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `${selectedRoleSpan.textContent || 'chat'}.json`; a.click(); URL.revokeObjectURL(url);
+  });
+
+  exportHistoryBtn.addEventListener('click', ()=>{
+    const blob = new Blob([JSON.stringify(loadHistory(),null,2)],{type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download='mohit_ai_history.json'; a.click(); URL.revokeObjectURL(url);
+  });
+  clearHistoryBtn.addEventListener('click', ()=>{ if(confirm('Clear all history?')){ localStorage.removeItem(HISTORY_KEY); renderHistory(); } });
+
+  // ---------- Utility ----------
+  function escapeHtml(s){ return (s+'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"})[m]); }
+
+  // ---------- Translate (placeholder) ----------
+  document.getElementById('toHindi').addEventListener('click', ()=>{ alert('Translate -> Hindi (placeholder)'); });
+  document.getElementById('toEnglish').addEventListener('click', ()=>{ alert('Translate -> English (placeholder)'); });
+
+  // ---------- Welcome canvas (emoji) ----------
+  function startWelcomeCanvas(){
+    const canvas = welcomeCanvas;
+    const ctx = canvas.getContext('2d');
+    function resize(){ canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+    window.addEventListener('resize', resize); resize();
+    const emojis = ['💖','🌸','✨','💐','❤️'];
+    const parts = [];
+    function create(){ parts.push({x: Math.random()*canvas.width, y: -30, speed: 1+Math.random()*3, e: emojis[Math.floor(Math.random()*emojis.length)], size: 16 + Math.random()*28}); }
+    function draw(){
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      if(parts.length < 80 && Math.random() < 0.7) create();
+      for(let i=parts.length-1;i>=0;i--){
+        const p = parts[i];
+        ctx.font = `${p.size}px serif`;
+        ctx.fillText(p.e, p.x, p.y);
+        p.y += p.speed;
+        p.x += Math.sin(p.y*0.01) * 0.5;
+        if(p.y > canvas.height + 30) parts.splice(i,1);
+      }
+      requestAnimationFrame(draw);
+    }
+    draw();
+  }
+  startWelcomeCanvas();
+
+  // ---------- Welcome hide (fade-out) logic ----------
+  function hideWelcomeWithFade(){
+    if(!welcome) return;
+    // If already hidden or in process, ignore
+    if(welcome.classList.contains('hidden')) return;
+    welcome.classList.add('hidden');
+    // After transition remove element from DOM (to ensure pointer-events below)
+    welcome.addEventListener('transitionend', function onEnd(e){
+      if(e.propertyName === 'opacity'){
+        try{ welcome.remove(); }catch(err){}
+        welcome.removeEventListener('transitionend', onEnd);
+      }
+    });
+  }
+
+  // Enter button and skip
+  enterBtn.addEventListener('click', ()=>{ hideWelcomeWithFade(); /* also spawn dramatic rain */ dramaticRain(); });
+  document.getElementById('skipWelcome').addEventListener('click', ()=>{ hideWelcomeWithFade(); });
+
+  // Keyboard Enter behavior:
+  window.addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter'){
+      // If welcome still exists: fade it
+      if(document.getElementById('welcome')){
+        hideWelcomeWithFade();
+        return; // don't trigger dramatic rain twice
+      }
+      // otherwise spawn slow-motion rain
+      dramaticRain();
+    }
+  });
+
+  function dramaticRain(){
+    const intensity = Math.min(150, +rainIntensity.value*2 + 50);
+    for(let i=0;i<intensity;i++){
+      setTimeout(()=>createPetal(null, Math.random()*100, 0), i*50);
+    }
+    flashOnce(window.innerWidth/2, window.innerHeight/2);
+  }
+
+  // ---------- Misc interactions ----------
+  // Allow Enter to send message while focused on textarea (without shift)
+  userInput.addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); sendBtn.click(); }
+  });
+
+  // click transcript to focus input
+  transcript.addEventListener('click', ()=>{ userInput.focus(); });
+
+  // remove overlay if user touches background area on mobile (small convenience)
+  welcome.addEventListener('touchstart', (ev)=>{
+    // if user taps on overlay background (not on buttons), fade
+    const t = ev.target;
+    if(t === welcome || t === welcomeCanvas) hideWelcomeWithFade();
+  });
+
+  // ---------- Init ----------
+  renderRoles();
+  renderHistory();
+  statusEl.textContent = 'Ready';
+
+  // small feedback when speech not supported
+  if(!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)){
+    startRecBtn.title = 'Speech recognition not supported in this browser';
+  }
+
+  // small accessibility: focus first input after welcome removed
+  document.addEventListener('click', (ev)=>{
+    if(!document.getElementById('welcome') && !document.getElementById('userName').disabled){
+      document.getElementById('userName').focus();
+    }
+  }, { once:true });
+
+  // Save last time on unload
+  window.addEventListener('beforeunload', ()=>{ localStorage.setItem('mohit_ai_last', new Date().toISOString()); });
+
+  </script>
+</body>
+</html>

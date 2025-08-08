@@ -1,0 +1,63 @@
+<!-- Save as index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>AI Demo</title>
+<style>body{font-family:Arial;background:#07102a;color:#e6f6ff;padding:18px} .box{background:#0d1726;padding:12px;border-radius:10px} select,input,button{padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.04)} #chat{height:300px;overflow:auto;background:#08111b;padding:8px;border-radius:8px;margin-top:8px}</style>
+</head>
+<body>
+  <div class="box">
+    <h2>AI Chat Demo</h2>
+    <label>Role:
+      <select id="roleSelect">
+        <option value="girlfriend">Girlfriend</option>
+        <option value="boyfriend">Boyfriend</option>
+        <option value="wife">Wife</option>
+        <option value="husband">Husband</option>
+        <option value="mom">Mom</option>
+        <option value="dad">Dad</option>
+        <option value="sister">Sister</option>
+        <option value="brother">Brother</option>
+        <option value="friend">Friend</option>
+      </select>
+    </label>
+    <div style="margin-top:8px">
+      <input id="userMsg" placeholder="Type message (e.g., Baby ghumne chale?)" style="width:60%">
+      <button id="sendBtn">Send</button>
+    </div>
+    <div id="chat"></div>
+  </div>
+
+  <script src="chat-handler.js"></script>
+  <script>
+    // load config then init chat handler
+    async function loadConfig() {
+      try {
+        const res = await fetch('ai-config.json');
+        if (!res.ok) throw new Error('Failed to fetch ai-config.json (use local server)');
+        const cfg = await res.json();
+        if (window.initChatHandler) window.initChatHandler(cfg);
+        console.log('Config loaded');
+      } catch (e) {
+        alert('Failed to load ai-config.json. Make sure file is in same folder and use a local server (Live Server) or host it.');
+        console.error(e);
+      }
+    }
+    loadConfig();
+
+    const chat = document.getElementById('chat');
+    function append(who, text){ const el = document.createElement('div'); el.innerHTML = `<b>${who}:</b> ${text}`; chat.prepend(el); }
+
+    document.getElementById('sendBtn').addEventListener('click', ()=>{
+      const role = document.getElementById('roleSelect').value;
+      const msg = document.getElementById('userMsg').value.trim();
+      if (!msg) return;
+      append('You', msg);
+      const reply = window.getAIReply ? window.getAIReply(role, msg) : 'AI not ready';
+      append('AI', reply);
+      document.getElementById('userMsg').value = '';
+    });
+  </script>
+</body>
+</html>

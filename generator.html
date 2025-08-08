@@ -1,0 +1,323 @@
+<!-- Save as generator.html (UTF-8) -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>AI Config Generator (Browser)</title>
+<style>
+  body{font-family:system-ui,Segoe UI,Roboto,Arial;background:#0b1220;color:#e6f0ff;padding:18px}
+  h1{margin:0 0 8px;font-size:20px}
+  .box{background:#0f1724;padding:14px;border-radius:10px;border:1px solid rgba(255,255,255,0.03);margin-bottom:12px}
+  label{display:block;margin-bottom:6px;font-size:13px;color:#bcd}
+  input[type=number]{width:120px;padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:inherit}
+  button{padding:10px 14px;border-radius:8px;border:none;background:#10b981;color:#011;cursor:pointer;margin-right:8px}
+  button.warn{background:#f59e0b;color:#111}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  textarea{width:100%;height:120px;background:#071025;color:#dff; padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.03)}
+  progress{width:100%;height:18px}
+  .small{font-size:12px;color:#9fb}
+</style>
+</head>
+<body>
+  <h1>AI Config JSON — Browser Generator</h1>
+  <div class="box">
+    <div class="row">
+      <label class="small">Select Roles & Per-role counts (start small to test):</label>
+    </div>
+    <div id="rolesContainer"></div>
+    <div style="margin-top:10px" class="row">
+      <button id="genSelectedBtn">Generate Selected (per-role)</button>
+      <button id="genAllBtn" class="warn">Generate All (ALL roles — large)</button>
+      <button id="downloadLast">Download Last JSON</button>
+      <div style="flex:1"></div>
+      <label class="small">Chunk size:<input id="chunkSize" type="number" value="1000" min="100" style="margin-left:6px"></label>
+    </div>
+    <div style="margin-top:8px">
+      <progress id="progressBar" value="0" max="1"></progress>
+      <div id="progressText" class="small">Ready</div>
+    </div>
+  </div>
+
+  <div class="box">
+    <div class="small">Preview (first 30 lines) — for test only:</div>
+    <textarea id="preview" readonly></textarea>
+  </div>
+
+<script>
+/*
+  Browser-based unique template generator.
+  - Role-specific templates & categories
+  - Batch generation using setTimeout to avoid blocking
+  - Produces one giant JSON with structure: { roles: { roleKey: { defaultName, templates: {category: [..], situational: {...}, calling: {...}}}}}
+  - For very large counts prefer per-role generation to avoid memory issues
+*/
+
+// ---- role config (adjust counts per need) ----
+const DEFAULT_CFG = {
+  girlfriend: { defaultName: "Riya", count: 50000, tone: "romantic" },
+  boyfriend: { defaultName: "Raj", count: 50000, tone: "romantic" },
+  wife: { defaultName: "Neha", count: 50000, tone: "romantic" },
+  husband: { defaultName: "Amit", count: 50000, tone: "romantic" },
+  mom: { defaultName: "Maa", count: 10000, tone: "caring" },
+  dad: { defaultName: "Papa", count: 10000, tone: "motivational" },
+  sister: { defaultName: "Sia", count: 10000, tone: "teasing" },
+  brother: { defaultName: "Rohan", count: 10000, tone: "supportive" },
+  friend: { defaultName: "Sam", count: 10000, tone: "funny" }
+};
+
+// ---- base fragments per role-tone (more fragments can be added) ----
+const FRAGMENTS = {
+  romantic: {
+    subjects: ["tum", "meri jaan", "baby", "meri pyaari", "meri zindagi", "pyaar"],
+    verbs: ["ko dekh ke", "ko yaad karke", "tumse baat karke", "soch ke"],
+    tails: ["mera dil khush ho jata hai", "main tumse bohot pyaar karti hoon", "tum meri duniya ho", "tum mere liye sab kuch ho"]
+  },
+  caring: {
+    subjects: ["beta", "meri jaan", "baby", "pyare"],
+    verbs: ["khana khaya?", "paani piya?", "aroma kaise ho?", "rest le liya?"],
+    tails: ["apna dhyan rakho", "ghar phir milte hain", "mujhe fikr hoti hai"]
+  },
+  motivational: {
+    subjects: ["beta", "dost", "hero"],
+    verbs: ["mehnat kar", "kadam badhao", "hausla rakho"],
+    tails: ["tum jeet jaoge", "mujhe tum par fakr hai", "kuch bhi mumkin hai"]
+  },
+  funny: {
+    subjects: ["pagal", "chonchla", "masti"],
+    verbs: ["has kar", "jokingly", "meme bhej ke"],
+    tails: ["tum to mast ho", "haha bohot funny", "lol"]
+  },
+  teasing: {
+    subjects: ["arey", "pagal", "shayar"],
+    verbs: ["masti karta hai", "mujhe tang karta hai"],
+    tails: ["tu to bindaas hai", "hamesha shaitani karta hai"]
+  },
+  supportive: {
+    subjects: ["bhai", "dost", "saathi"],
+    verbs: ["main tumhare saath hoon", "tum kar sakte ho"],
+    tails: ["kabhi darna mat", "main hoon na"]
+  }
+};
+
+const SITUATIONAL = {
+  morning: ["Good morning {name} ☀️","Subah ka pehla message tumhare liye {name}"],
+  night: ["Good night {name} 🌙","Sweet dreams {name}"],
+  busy: ["Jaldi kaam nipta lo, phir baat karte hain","Focus kar lo, main yahin hoon"],
+  weather: ["Aaj mausam suhana hai","Thand lag rahi hai? sweater pehno"]
+};
+
+const CALLING_STUBS = {
+  start: ["Hello {name}, kaise ho?","Hi {name}, suno zara"],
+  middle: ["Main tumse baat karke khush hoon","Aaj tumne kya kiya?"],
+  end: ["Theek hai, phir baat karte hain","Bye {name}, take care"]
+};
+
+const EMOJIS = ["❤️","💕","😚","😘","🥰","💖","😊","😄","😜","😂","🔥","🌧️","☀️"];
+const ACTIVITIES = ["phone call","walk","chat","movie","trip","dinner","shopping","call"];
+const PLACES = ["duniya","zindagi","dil","khwab","manzil","kahani","safar"];
+const TIMES = ["subah","shaam","raat","har din","har pal","chand raat"];
+
+// ---- Build UI role list ----
+const rolesContainer = document.getElementById('rolesContainer');
+for (const key of Object.keys(DEFAULT_CFG)) {
+  const cfg = DEFAULT_CFG[key];
+  const div = document.createElement('div');
+  div.className = 'row';
+  div.innerHTML = `
+    <label style="width:100%">
+      <input type="checkbox" checked data-role="${key}" /> <strong style="margin-left:8px">${key}</strong>
+      &nbsp; defaultName: <input type="text" data-name="${key}" value="${cfg.defaultName}" style="width:130px;margin-left:6px" />
+      Count: <input type="number" data-count="${key}" value="${cfg.count}" style="width:110px;margin-left:6px" />
+    </label>
+  `;
+  rolesContainer.appendChild(div);
+}
+
+// helper: assemble one unique line from templates with placeholders
+function makeLine(role, category, name) {
+  const f = FRAGMENTS[category] || FRAGMENTS['romantic'];
+  // compose multiple patterns to increase variety
+  const patterns = [
+    `{subject} {verb} {tail} {emoji}`,
+    `{subject} {tail} {emoji}`,
+    `{subject} {verb} {emoji}`,
+    `{tail} {emoji}`,
+    `${name}, {tail} {emoji}`
+  ];
+  const p = patterns[Math.floor(Math.random()*patterns.length)];
+  const subject = f.subjects[Math.floor(Math.random()*f.subjects.length)];
+  const verb = f.verbs[Math.floor(Math.random()*f.verbs.length)];
+  const tail = f.tails[Math.floor(Math.random()*f.tails.length)];
+  const emoji = EMOJIS[Math.floor(Math.random()*EMOJIS.length)];
+  return p
+    .replace("{subject}", subject)
+    .replace("{verb}", verb)
+    .replace("{tail}", tail)
+    .replace("{emoji}", emoji)
+    .replace("{name}", name);
+}
+
+// generate one role's templates (object with categories + situational + calling)
+function generateRoleTemplates(roleKey, name, targetCount, chunkSize, onProgress, done) {
+  // We'll build category arrays with proportional sizes
+  // categories: romantic, caring, motivational, funny, teasing, supportive
+  const categories = Object.keys(FRAGMENTS);
+  const allocation = {
+    romantic: Math.round(targetCount * 0.35),
+    caring: Math.round(targetCount * 0.18),
+    motivational: Math.round(targetCount * 0.12),
+    funny: Math.round(targetCount * 0.12),
+    teasing: Math.round(targetCount * 0.08),
+    supportive: Math.round(targetCount * 0.08)
+  };
+  // situational small arrays
+  const situCountPer = Math.max(5, Math.round(targetCount * 0.02));
+
+  const result = { romantic:[], caring:[], motivational:[], funny:[], teasing:[], supportive:[], situational:{}, calling:{} };
+
+  // set to ensure uniqueness
+  const seen = new Set();
+  let produced = 0;
+  const totalToProduce = Object.values(allocation).reduce((a,b)=>a+b,0) + (situCountPer*Object.keys(SITUATIONAL).length) + 3;
+
+  // process generation in batches
+  function produceBatch() {
+    const needed = totalToProduce - produced;
+    const batch = Math.min(chunkSize, Math.max(1, needed));
+    for (let i=0;i<batch;i++) {
+      // pick a category according to allocation weights
+      let cat = weightedPick(allocation);
+      const line = makeLine(roleKey, cat, name);
+      if (!seen.has(line)) {
+        seen.add(line);
+        result[cat].push(line);
+        produced++;
+      }
+    }
+    // update progress
+    onProgress(produced / totalToProduce);
+    if (produced < totalToProduce) {
+      setTimeout(produceBatch, 0); // yields to UI
+    } else {
+      // fill situational
+      result.situational = {};
+      for (const k of Object.keys(SITUATIONAL)) {
+        const arr = [];
+        for (let j=0;j<situCountPer;j++) {
+          const template = SITUATIONAL[k][Math.floor(Math.random()*SITUATIONAL[k].length)];
+          arr.push(template.replace("{name}", name).replace("{emoji}", EMOJIS[Math.floor(Math.random()*EMOJIS.length)] || ""));
+        }
+        result.situational[k] = arr;
+      }
+      // calling stubs
+      result.calling = {
+        start: CALLING_STUBS.start[Math.floor(Math.random()*CALLING_STUBS.start.length)].replace("{name}", name),
+        middle: CALLING_STUBS.middle[Math.floor(Math.random()*CALLING_STUBS.middle.length)],
+        end: CALLING_STUBS.end[Math.floor(Math.random()*CALLING_STUBS.end.length)].replace("{name}", name)
+      };
+      done(result);
+    }
+  }
+  produceBatch();
+}
+
+// weighted pick helper returns a key among allocation where value>0, picks proportionally
+function weightedPick(obj) {
+  const entries = Object.entries(obj);
+  const total = entries.reduce((s,kv)=>s+kv[1],0);
+  let r = Math.random()*total;
+  for (const [k,v] of entries) {
+    if (r < v) return k;
+    r -= v;
+  }
+  return entries[0][0];
+}
+
+// UI handlers
+const progressBar = document.getElementById('progressBar');
+const progressText = document.getElementById('progressText');
+const preview = document.getElementById('preview');
+
+function setProgress(v,msg) {
+  progressBar.value = v;
+  progressText.textContent = msg || `${Math.round(v*100)}%`;
+}
+
+// get selected roles + counts
+function readSelections() {
+  const res = [];
+  document.querySelectorAll('input[type=checkbox][data-role]').forEach(chk=>{
+    if (chk.checked) {
+      const role = chk.dataset.role;
+      const name = document.querySelector(`input[data-name="${role}"]`).value || DEFAULT_CFG[role].defaultName;
+      const count = parseInt(document.querySelector(`input[data-count="${role}"]`).value) || DEFAULT_CFG[role].count;
+      res.push({ role, name, count });
+    }
+  });
+  return res;
+}
+
+// store last data
+let lastOutput = null;
+
+document.getElementById('genSelectedBtn').addEventListener('click', async ()=>{
+  const sel = readSelections();
+  if (!sel.length) return alert('Select at least one role');
+  const chunk = Math.max(100, parseInt(document.getElementById('chunkSize').value||1000));
+  const final = { roles: {} };
+  let overallTotal = sel.reduce((s,x)=>s + x.count,0);
+  let overallProduced = 0;
+  setProgress(0, 'Starting generation...');
+  preview.value = '';
+  for (const r of sel) {
+    setProgress(overallProduced/overallTotal, `Generating ${r.role} ...`);
+    // generate per-role
+    // show small preview initially while generating
+    await new Promise((resolve)=>{
+      generateRoleTemplates(r.role, r.name, r.count, chunk, (p)=>{
+        // p = progress for this role
+        setProgress((overallProduced + Math.floor(p * r.count)) / overallTotal, `Generating ${r.role}: ${Math.round(p*100)}%`);
+      }, (templates)=>{
+        final.roles[r.role] = { defaultName: r.name, templates };
+        overallProduced += r.count;
+        // small preview update
+        preview.value = Object.keys(final.roles).map(k=>{
+          const t = final.roles[k].templates.romantic || [];
+          return `${k}: ${t.slice(0,6).join(' | ')}`;
+        }).join("\n\n");
+        resolve();
+      });
+    });
+  }
+  setProgress(1, 'Generation complete — preparing download');
+  lastOutput = final;
+  // download
+  const blob = new Blob([JSON.stringify(final, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'ai-config.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  setProgress(0, 'Done — file downloaded');
+});
+
+document.getElementById('genAllBtn').addEventListener('click', async ()=>{
+  if (!confirm('Generate ALL roles now? This may take long and produce a very large file. Continue?')) return;
+  // select all with default counts
+  document.querySelectorAll('input[type=checkbox][data-role]').forEach(chk=>chk.checked=true);
+  document.getElementById('genSelectedBtn').click();
+});
+
+document.getElementById('downloadLast').addEventListener('click', ()=>{
+  if (!lastOutput) return alert('No output yet. Generate first.');
+  const blob = new Blob([JSON.stringify(lastOutput, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'ai-config.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+});
+</script>
+</body>
+</html>
